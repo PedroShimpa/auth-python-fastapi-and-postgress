@@ -5,9 +5,9 @@ from api.v1.api import api_router
 
 
 app = FastAPI(
-    title='API de cadastro de clientes by PedroShimpa',
+    title='API de cadastro de contatos e autenticação by PedroShimpa',
     version='1.0',
-    description="Leia o arquivo README deste projeto para conhecer as dependencias e enpoints",
+    description="Leia o arquivo README deste projeto para conhecer mais sobre o projeto",
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
