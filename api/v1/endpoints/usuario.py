@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-
+from sqlalchemy.exc import IntegrityError
 from models.usuario_model import UsuarioModel
 from schemas.usuario_schema import UsuarioSchemaBase, UsuarioSchemaContatos, UsuarioSchemaCreate, UsuarioSchemaUp
 from core.deps import get_session, get_current_user
@@ -17,15 +17,16 @@ from core.auth import autenticar, criar_token_acesso
 router = APIRouter()
 
 
-@router.get('/login', response_model=UsuarioSchemaBase)
+@router.post('/login', response_model=UsuarioSchemaBase)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(),  db: AsyncSession = Depends(get_session)):
-    usuario = await autenticar(email=form_data.username, senha=form_data.password,db=db)
+    usuario = await autenticar(email=form_data.username, senha=form_data.password, db=db)
 
     if not usuario:
-              raise HTTPException(detail='Dados de acesso inválidos',
-                                status_code=status.HTTP_400_BAD_REQUEST)
-    
+        raise HTTPException(detail='Dados de acesso inválidos',
+                            status_code=status.HTTP_400_BAD_REQUEST)
+
     return JSONResponse(content={"access_token": criar_token_acesso(sub=usuario.id), "token_type": "bearer"}, status_code=status.HTTP_200_OK)
+
 
 @router.get('/logado', response_model=UsuarioSchemaBase)
 def get_logado(usuario_logado: UsuarioModel = Depends(get_current_user)):
@@ -37,10 +38,14 @@ async def post_usuario(usuario: UsuarioSchemaCreate, db: AsyncSession = Depends(
     novo_usuario: UsuarioModel = UsuarioModel(nome=usuario.nome, sobrenome=usuario.sobrenome,
                                               email=usuario.email, senha=gerar_hash_senha(usuario.senha), admin=usuario.admin)
     async with db as session:
-        session.add(novo_usuario)
-        await session.commit()
-        
-    return novo_usuario
+        try:
+            session.add(novo_usuario)
+            await session.commit()
+            return novo_usuario
+        except IntegrityError:
+            raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                            detail='Já existe um usuário com este email cadastrado.')
+
 
 @router.get('/', response_model=List[UsuarioSchemaBase], status_code=status.HTTP_200_OK)
 async def get_usuarios(usuario_logado: UsuarioModel = Depends(get_current_user), db: AsyncSession = Depends(get_session)):
@@ -49,10 +54,10 @@ async def get_usuarios(usuario_logado: UsuarioModel = Depends(get_current_user),
         result = await session.execute(query)
         usuarios: List[UsuarioModel] = result.scalars().all()
         return usuarios
-    
- 
+
+
 @router.get('/{usuario_id}', status_code=status.HTTP_200_OK, response_model=UsuarioSchemaContatos)
-async def get_usuario(usuario_id: int,usuario_logado: UsuarioModel = Depends(get_current_user), db: AsyncSession = Depends(get_session)):
+async def get_usuario(usuario_id: int, usuario_logado: UsuarioModel = Depends(get_current_user), db: AsyncSession = Depends(get_session)):
     async with db as session:
         query = select(UsuarioModel).filter(UsuarioModel.id == usuario_id)
         result = await session.execute(query)
@@ -61,8 +66,9 @@ async def get_usuario(usuario_id: int,usuario_logado: UsuarioModel = Depends(get
             return usuario
         else:
             raise HTTPException(detail='usuario não encontrado',
-                                status_code=status.HTTP_404_NOT_FOUND)   
-            
+                                status_code=status.HTTP_404_NOT_FOUND)
+
+
 @router.put('/{usuario_id}', status_code=status.HTTP_202_ACCEPTED, response_model=UsuarioSchemaBase)
 async def update_contato(usuario_id: int, usuario: UsuarioSchemaUp, usuario_logado: UsuarioModel = Depends(get_current_user), db: AsyncSession = Depends(get_session)):
     async with db as session:
@@ -96,4 +102,3 @@ async def delete_usuario(usuario_id: int, usuario_logado: UsuarioModel = Depends
         else:
             raise HTTPException(detail='contato não encontrado',
                                 status_code=status.HTTP_404_NOT_FOUND)
-
