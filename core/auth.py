@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt
 
 from pydantic import EmailStr
-from model.usuario_model import UsuarioModel
+from models.usuario_model import UsuarioModel
 from core.configs import settings
 from core.security import verificar_senha
 
@@ -19,7 +19,7 @@ oauth2_schema = OAuth2PasswordBearer(
 )
 
 
-async def autenticar(email: EmailStr, senha: str, db: AsyncSession) -> Optional(UsuarioModel):
+async def autenticar(email: EmailStr, senha: str, db: AsyncSession) -> Optional[UsuarioModel]:
     async with db as session:
         query = select(UsuarioModel).filter(UsuarioModel.email == email)
         result = await session.execute(query)

@@ -3,7 +3,7 @@ from core.database import engine
 
 
 async def create_tables() -> None:
-    import models.__all_models
+    import models.__all_models_
     print('Criando as tabelas no banco de dados...')
 
     async with engine.begin() as conn:
